@@ -1,0 +1,308 @@
+[0] Export and transform data
+
+    - Login to ShulCloud as admin
+    - Go to Reports
+    - Membership Report
+    - Run the report (takes about a minute)
+    - Filter out the Resigned and any other category that's not a member
+    - Export the report to Excel
+    - Open Excel file along with ETL example (from prior year)
+    - Copy "transform" tab into new spreadsheet
+    - Find/replace to remove filename references
+    - Expand or contract the table as needed
+    - Copy/paste to add rows as needed
+    - Adjust names on Sheet1 as needed so there are no formula errors
+    - Copy/paste member data into Members.xlsx
+    - Bring in College students from CATS in College
+    - Sort by Status
+
+
+[1] Populate official first/last names - SHOULD NOT BE REQUIRED
+
+UPDATE People SET People.OfficialLastName = People.LastName, People.OfficialFirstNames = People.FirstNames
+WHERE ((People.OfficialLastName IS NULL) OR (People.OfficialFirstNames IS NULL))
+
+** Note: Names from the shul may or may not include spousal last names (e.g. Sandy Goodman or Clara Hernandez).
+         Need to ensure that Members.xlsx file matches the official names in MySQL (meaning just first names and the husband's last name).
+
+
+[2] Convert all to non-members
+
+UPDATE People SET People.Status = "Non-Member"
+
+
+[3A] Import current membership list (including associates and college students) to Members table
+
+- create spreadsheet with columns:
+  FirstNames,LastName,StreetAddress,City,State,ZipCode,PhoneNumber,Email1,Email2,Status
+
+- reformat phone numbers to XXX-XXX-XXXX format  // IF NEEDED
+- search for " and " and replace with " & "
+- check for P.O. Boxes (e.g. Fink) and replace with house address
+- be careful of Zip Codes that start with zero (if any)
+- save
+
+- remove row of column headings
+- export spreadsheet to CSV file
+
+- empty table Members
+- import CSV file to table Members
+
+
+[3B] Update member addresses
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.StreetAddress=Members.StreetAddress, People.City=Members.City, People.State=Members.State, People.ZipCode=Members.ZipCode, People.Mapsco=NULL, People.DeliveryRoute="",
+People.Delivery=((Members.State="TX") AND (Members.City IN ("Dallas","Plano","Addison","Richardson","Carrollton","Frisco","McKinney","Allen","The Colony")))
+WHERE ((People.Status="Non-Member") AND ((Members.City<>People.City) OR (Members.StreetAddress<>People.StreetAddress)) AND (Members.StreetAddress IS NOT NULL) AND (Members.StreetAddress<>""))
+
+
+[4] Update member phones
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.PhoneNumber = Members.PhoneNumber
+WHERE ((Members.PhoneNumber<>"") AND (People.PhoneNumber IS NULL OR (Members.PhoneNumber<>People.PhoneNumber)) AND (People.AltPhoneNumber IS NULL OR (Members.PhoneNumber<>People.AltPhoneNumber)))
+
+** If forgot to reformat the phone numbers, use this:
+
+UPDATE People SET PhoneNumber=CONCAT(MID(PhoneNumber,2,3),"-",MID(PhoneNumber,7,8))
+WHERE (MID(PhoneNumber,1,1)="(" AND MID(PhoneNumber,5,1)=")" AND LENGTH(PhoneNumber)=14)
+
+
+[4A] Update member emails (4 SQL stmts - can run all at once)
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.Email = Members.Email1
+WHERE ((Members.Email1 <> "") AND ((People.Email = "") OR People.Email IS NULL));
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.Email2 = Members.Email1
+WHERE ((Members.Email1 <> "") AND (People.Email IS NULL OR (Members.Email1 <> People.Email)) AND (People.Email2 IS NULL OR (Members.Email1 <> People.Email2)));
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.Email = Members.Email2
+WHERE ((Members.Email2 <> "") AND ((People.Email = "") OR People.Email IS NULL));
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.Email2 = Members.Email2
+WHERE ((Members.Email2 <> "") AND (People.Email IS NULL OR (Members.Email2 <> People.Email)) AND (People.Email2 IS NULL OR (Members.Email2 <> People.Email2)));
+
+
+[5] Update member status
+
+UPDATE People INNER JOIN Members
+ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+SET People.Status = Members.Status
+WHERE (People.Status<>Members.Status)
+
+- write down how many were updated
+
+
+[6] Find dropped names
+
+SELECT Members.LastName, Members.FirstNames, Members.Status, People.Status, People.OfficialLastName, People.OfficialFirstNames
+FROM Members INNER JOIN People ON (Members.LastName = People.LastName) AND (Members.FirstNames = People.FirstNames)
+WHERE (People.Status="Non-Member")
+
+- if any rows found, update the People official names to match Member names and then rerun steps 3B, 4, 4A, and 5
+
+- use the following query if all results look kosher:
+UPDATE People INNER JOIN Members ON (Members.LastName = People.LastName) AND (Members.FirstNames = People.FirstNames)
+SET OfficialLastName=Members.LastName,OfficialFirstNames=Members.FirstNames
+WHERE (People.Status="Non-Member") AND People.OfficialLastName<>People.LastName AND People.OfficialFirstNames<>People.FirstNames
+
+- run query from step 5 again to update member status
+
+
+[7] Add new members
+
+INSERT INTO People (LastName, FirstNames, StreetAddress, City, State, ZipCode, PhoneNumber, Email, Email2, Status, AndFamily, Staff, Delivery, OfficialLastName, OfficialFirstNames, LastUpdated)
+SELECT Members.LastName, Members.FirstNames, Members.StreetAddress, Members.City, Members.State, Members.ZipCode, Members.PhoneNumber, Members.Email1, Members.Email2, Members.Status, 0, 0,
+((Members.State="TX") AND (Members.City IN ("Dallas","Plano","Addison","Richardson","Carrollton","Frisco","McKinney","Allen","The Colony"))),
+Members.LastName, Members.FirstNames, NULL
+FROM Members LEFT JOIN People ON (Members.LastName = People.OfficialLastName) AND (Members.FirstNames = People.OfficialFirstNames)
+WHERE (People.NameID IS NULL)
+
+- write down how many were added
+- make sure total membership is correct
+
+
+[7A] Cleanup new member emails (shift Email2 to Email if blank)
+
+UPDATE People SET Email = Email2, Email2 = ""
+WHERE (Email IS NULL OR Email="") AND Email2 IS NOT NULL AND Email2<>""
+
+
+[8A] Find people with matching phone numbers
+
+SELECT p1.NameID, p1.LastName, p1.FirstNames, p1.Status, p2.NameID, p2.LastName, p2.FirstNames, p2.Status, p1.StreetAddress, p2.StreetAddress, p2.PhoneNumber
+FROM People AS p1 INNER JOIN People AS p2
+ON (p1.PhoneNumber<>"" AND p1.PhoneNumber<>"n/a" AND (p1.PhoneNumber=p2.PhoneNumber OR p1.PhoneNumber=p2.AltPhoneNumber))
+OR (p1.AltPhoneNumber<>"" AND p1.AltPhoneNumber<>"n/a" AND (p1.AltPhoneNumber=p2.AltPhoneNumber OR p1.AltPhoneNumber=p2.PhoneNumber))
+WHERE p1.Status="Non-Member" AND p2.Status<>"Non-Member" AND (p1.LastName<>p2.LastName OR p1.FirstNames<>p2.FirstNames)
+ORDER BY p1.NameID, p2.NameID
+
+- if any rows found, analyze results and take appropriate actions
+
+- some may be due to swapped husband and wife names; the following two queries will deal with those:
+
+UPDATE People AS dest, (
+SELECT p1.NameID AS id, p2.FirstNames AS first, p2.StreetAddress AS street, p2.City AS city, p2.State AS state, p2.ZipCode AS zip, p2.Status AS stat
+FROM People AS p1 INNER JOIN People AS p2 ON p1.PhoneNumber = p2.PhoneNumber
+WHERE ((p1.Status="Non-Member") AND (p2.Status<>"Non-Member") AND (p1.LastName=p2.LastName) AND (p1.FirstNames<>p2.FirstNames) AND (p1.PhoneNumber IS NOT NULL) AND (p1.PhoneNumber<>"") AND (p1.PhoneNumber<>"n/a")) AND (p1.LastName=p2.LastName) AND
+(p1.FirstNames=IF(INSTR(p2.FirstNames," & ") > 0, CONCAT(SUBSTRING(p2.FirstNames,INSTR(p2.FirstNames," & ")-CHAR_LENGTH(p2.FirstNames)+2)," & ",LEFT(p2.FirstNames,INSTR(p2.FirstNames," & ")-1)), ""))
+) AS src
+SET dest.OfficialFirstNames=src.first, dest.StreetAddress=src.street, dest.City=src.city, dest.State=src.state, dest.ZipCode=src.zip, dest.Status=src.stat
+WHERE dest.NameID=src.id;
+
+DELETE dest FROM People dest INNER JOIN (
+SELECT distinct p2.NameID AS NameID
+FROM People AS p1 INNER JOIN People AS p2 ON p1.PhoneNumber = p2.PhoneNumber
+WHERE ((p1.NameID < p2.NameID) AND (p1.LastName=p2.LastName) AND (p1.FirstNames<>p2.FirstNames) AND (p1.PhoneNumber IS NOT NULL) AND (p1.PhoneNumber<>"") AND (p1.PhoneNumber<>"n/a")) AND (p1.LastName=p2.LastName) AND
+(p1.FirstNames=IF(INSTR(p2.FirstNames," & ") > 0, CONCAT(SUBSTRING(p2.FirstNames,INSTR(p2.FirstNames," & ")-CHAR_LENGTH(p2.FirstNames)+2)," & ",LEFT(p2.FirstNames,INSTR(p2.FirstNames," & ")-1)), ""))
+) src
+ON dest.NameID=src.NameID;
+
+- after the above, you must re-run the email queries (step 4A)
+- then return 8A to find other matches that may need attention
+
+
+[8B] Find people with matching addresses
+
+SELECT p1.NameID AS NameID1, p1.FirstNames AS First1, p1.LastName AS Last1, p1.Status AS Status1, p1.StreetAddress AS Street1,
+p2.StreetAddress AS Street2, p2.FirstNames AS First2, p2.LastName AS Last2, p2.Status AS Status2, p2.NameID AS NameID2
+FROM People AS p1
+JOIN People AS p2 ON ((p1.NameID <> p2.NameID) AND (p1.State=p2.State) AND (p1.City=p2.City) AND (INSTR(REPLACE(REPLACE(REPLACE(LOWER(p2.StreetAddress),",",""),".",""),"  "," "),REPLACE(REPLACE(REPLACE(LOWER(p1.StreetAddress),",",""),".",""),"  "," ")) > 0))
+WHERE ((p1.Status="Non-Member") AND (p2.Status<>"Non-Member") AND (LENGTH(p1.ZipCode) > 0) AND (LENGTH(p2.ZipCode) > 0) AND (INSTR(p1.StreetAddress,"c/o ") = 0) AND (INSTR(p2.StreetAddress,"c/o ") = 0))
+ORDER BY p1.LastName, p1.FirstNames, p2.LastName, p2.FirstNames
+
+- if any rows found, analyze results and take appropriate actions
+- this generally involves copying new info into Non-Member, changing to Member (or Associate), and removing new (unmatched) Member entry
+
+- some may be due to swapped husband and wife names; the following two queries will deal with those:
+
+UPDATE People AS dest, (
+SELECT p1.NameID AS id, p2.LastName AS last, p2.FirstNames AS first, p2.StreetAddress AS street, p2.City AS city, p2.State AS state, p2.ZipCode AS zip, p2.Status AS stat
+FROM People AS p1 INNER JOIN People AS p2
+ON ((p1.NameID <> p2.NameID) AND (p1.State=p2.State) AND (p1.City=p2.City) AND (INSTR(REPLACE(REPLACE(REPLACE(LOWER(p2.StreetAddress),",",""),".",""),"  "," "),REPLACE(REPLACE(REPLACE(LOWER(p1.StreetAddress),",",""),".",""),"  "," ")) > 0))
+WHERE (p1.Status="Non-Member") AND (p2.Status<>"Non-Member") AND (LENGTH(p1.ZipCode) > 0) AND (LENGTH(p2.ZipCode) > 0) AND INSTR(p1.StreetAddress,"c/o ") = 0 AND INSTR(p2.StreetAddress,"c/o ") = 0 AND
+(p1.FirstNames=IF(INSTR(p2.FirstNames," & ") > 0, CONCAT(SUBSTRING(p2.FirstNames,INSTR(p2.FirstNames," & ")-CHAR_LENGTH(p2.FirstNames)+2)," & ",LEFT(p2.FirstNames,INSTR(p2.FirstNames," & ")-1)), ""))
+) AS src
+SET dest.OfficialLastName=src.last, dest.OfficialFirstNames=src.first, dest.StreetAddress=src.street, dest.City=src.city, dest.State=src.state, dest.ZipCode=src.zip, dest.Status=src.stat
+WHERE dest.NameID=src.id;
+
+DELETE dest FROM People dest INNER JOIN (
+SELECT distinct p2.NameID AS NameID
+FROM People AS p1 INNER JOIN People AS p2
+ON ((p1.NameID <> p2.NameID) AND (p1.State=p2.State) AND (p1.City=p2.City) AND (INSTR(REPLACE(REPLACE(REPLACE(LOWER(p2.StreetAddress),",",""),".",""),"  "," "),REPLACE(REPLACE(REPLACE(LOWER(p1.StreetAddress),",",""),".",""),"  "," ")) > 0))
+WHERE (p1.NameID < p2.NameID) AND LENGTH(p1.ZipCode) > 0 AND LENGTH(p2.ZipCode) > 0 AND INSTR(p1.StreetAddress,"c/o ") = 0 AND INSTR(p2.StreetAddress,"c/o ") = 0 AND
+(p1.FirstNames=IF(INSTR(p2.FirstNames," & ") > 0, CONCAT(SUBSTRING(p2.FirstNames,INSTR(p2.FirstNames," & ")-CHAR_LENGTH(p2.FirstNames)+2)," & ",LEFT(p2.FirstNames,INSTR(p2.FirstNames," & ")-1)), ""))
+) src
+ON dest.NameID=src.NameID;
+
+- after the above, you must re-run the email queries (step 4A)
+- then return 8B to find other matches that may need attention
+
+
+[8C] Find people with matching emails
+
+SELECT p1.NameID, p1.LastName, p1.FirstNames, p1.Status, p2.NameID, p2.LastName, p2.FirstNames, p2.Status,
+p1.Email, p2.Email, p1.Email2, p2.Email2
+FROM People AS p1 INNER JOIN People AS p2
+ON (p1.Email<>"" AND (p1.Email=p2.Email OR p1.Email=p2.Email2))
+OR (p1.Email2<>"" AND (p1.Email2=p2.Email2 OR p1.Email2=p2.Email))
+WHERE p1.Status="Non-Member" AND p2.Status<>"Non-Member" AND (p1.LastName<>p2.LastName OR p1.FirstNames<>p2.FirstNames)
+ORDER BY p1.NameID, p2.NameID
+
+- if any rows found, analyze results and take appropriate actions
+
+
+[9A] Confirm and cleanup staff members
+
+SELECT LastName, FirstNames, StreetAddress, City, State, ZipCode, Delivery, DeliveryRoute, Status, Staff
+FROM People WHERE ((Staff=1) AND (Status="Member" OR Status="Associate"))
+ORDER BY LastName,FirstNames
+
+- if no longer staff, clear staff field
+- for staff members set DeliveryRoute="AT" and address as appropriate for delivery to shul
+- NOTE: if staff has no zip code and is no longer a member, website will not suggest as a write-in
+
+
+[9B] Confirm and update office staff & faculty
+
+SELECT NameID, LastName, FirstNames, StreetAddress, City, State, ZipCode, Delivery, DeliveryRoute, Status, Staff
+FROM People WHERE ((DeliveryRoute="AT") AND (Status="Non-Member"))
+ORDER BY StreetAddress,LastName,FirstNames
+
+- if no longer staff, clear staff field and change address to "No address on file (former staff member)"
+- set staff field if returning staff
+- add additional entries as required for new staff (first checking to see if they're already in DB)
+- address field options:
+    - Anshai Torah Staff
+    - Anshai Torah Catering Staff
+    - Anshai Torah Preschool
+    - Anshai Torah Religious School
+
+
+[10A] Sort People table by Last, First names and browse for possible duplicates
+
+SELECT DISTINCT p1.NameID, p1.LastName, p1.FirstNames, p1.StreetAddress, p1.Status
+FROM People p1, People p2
+WHERE p1.NameID <> p2.NameID AND p1.LastName<>"Family"
+(INSTR(p1.LastName, p2.LastName)=1 OR INSTR(p2.LastName, p1.LastName)=1)
+ORDER BY 2, 3
+
+- problematic example #1: "Nate Meiches" vs. "Nathan Meiches"
+- problematic example #2: "The Cassius Family" vs. "Mark & Jennifer Cassius"
+
+
+[10B] Find People with cross-matching names to look for possible duplicates
+
+SELECT p1.NameID, p1.LastName, p1.FirstNames, p1.StreetAddress, p1.Status,
+p2.LastName, p2.FirstNames, p2.StreetAddress, p2.Status, p2.NameID
+FROM People p1, People p2
+WHERE p1.NameID <> p2.NameID AND INSTR(p1.LastName, p2.FirstNames)>0 AND INSTR(p2.LastName, p1.FirstNames)>0
+ORDER BY 2, 3
+
+- problematic example: "Smith, Sam & Paula Poundstone" vs. "Poundstone, Paula & Sam Smith"
+
+
+[11] Check addresses OutsideDeliveryArea
+
+- none should have Delivery=1 unless we have a plan to deliver
+- any we shouldn't be shipping this year?
+
+
+[12] Send initial address list to Shalach Manot chair
+
+SELECT NameID, FirstNames AS First, LastName AS Last, StreetAddress AS Street, City, State, ZipCode AS Zip, Status, DeliveryRoute AS "Route (last year)"
+FROM People
+WHERE Delivery=1 AND (Status="Member" OR Status="Associate" OR Status="College") AND DeliveryRoute<>"AT"
+ORDER BY LastName, FirstNames
+
+
+[13] Remove self-pickup addresses if prior year had self pickup and this year does not
+
+UPDATE People
+SET DeliveryRoute=NULL
+WHERE DeliveryRoute="AT" AND Status<>"Non-Member" AND Staff=0
+
+
+[14] Download the checklist (when ready)
+
+http://anshaitorah.org/shalachmanot/admin.php?action=checklist
+
+
+[15] Assign or update "admin" passwords for staff and committee members
+
+INSERT INTO Admins (Email, Name, Passhash, Token)
+VALUES ('name@domain', 'User Name', SHA2('p@ssw0rd', 256), '')
+
+UPDATE Admins SET Passhash=SHA2('new password', 256)
+WHERE Email='email address'

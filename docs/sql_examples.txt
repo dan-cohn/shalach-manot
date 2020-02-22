@@ -1,0 +1,210 @@
+--- General Notes ---
+
+* All queries need to be designed to take the year into account.
+* All queries currently assume there's at least one Benefactor.
+* May need to run "set session group_concat_max_len = 10000" before running one of the *Summary queries
+  (but it only works if in the same command line)
+
+
+FIND MULTIPLE WRITE-INS FOR THE SAME FAMILY (for the sake of checking for name/address discrepancies):
+
+SELECT ow1.NameID AS NameID, ow1.Name AS Name1, ow2.Name AS Name2, ow1.StreetAddress AS Street1, ow2.StreetAddress AS Street2,
+CONCAT(ow1.City,", ",ow1.State," ",ow1.ZipCode) AS CityStateZip1, CONCAT(ow2.City,", ",ow2.State," ",ow2.ZipCode) AS CityStateZip2,
+o1.NameID AS FromID1, CONCAT(p1.FirstNames," ",p1.LastName) AS FromName1, o2.NameID AS FromID2, CONCAT(p2.FirstNames," ",p2.LastName) AS FromName2
+FROM OrderWriteins AS ow1
+JOIN Orders AS o1 ON o1.OrderNumber=ow1.OrderNumber
+JOIN People AS p1 ON o1.NameID=p1.NameID
+JOIN OrderWriteins AS ow2 ON ow1.NameID=ow2.NameID
+JOIN Orders AS o2 ON o2.OrderNumber=ow2.OrderNumber
+JOIN People AS p2 ON o2.NameID=p2.NameID
+WHERE ((o1.Year=YEAR(CURDATE())) AND (o2.Year=YEAR(CURDATE())) AND (o1.OrderNumber < o2.OrderNumber))
+ORDER BY ow1.NameID
+
+
+FIND MATCHING ADDRESSES (to check for possible duplicate people entries):
+
+SELECT p1.NameID AS NameID1, p1.FirstNames AS First1, p1.LastName AS Last1, p1.Status AS Status1, p1.StreetAddress AS Street1,
+p2.StreetAddress AS Street2, p2.FirstNames AS First2, p2.LastName AS Last2, p2.Status AS Status2, p2.NameID AS NameID2
+FROM People AS p1
+JOIN People AS p2 ON ((p1.NameID <> p2.NameID) AND (p1.State=p2.State) AND (p1.City=p2.City) AND (INSTR(REPLACE(REPLACE(REPLACE(LOWER(p2.StreetAddress),",",""),".",""),"  "," "),REPLACE(REPLACE(REPLACE(LOWER(p1.StreetAddress),",",""),".",""),"  "," ")) > 0))
+WHERE ((LENGTH(p1.ZipCode) > 0) AND (LENGTH(p2.ZipCode) > 0) AND (INSTR(p1.StreetAddress,"c/o ") = 0) AND (INSTR(p2.StreetAddress,"c/o ") = 0))
+ORDER BY p1.LastName, p1.FirstNames, p2.LastName, p2.FirstNames
+
+
+TO CHECK RECIPROCITY TOTALS IN ADVANCE:
+
+SELECT COUNT(*),FromID,FromLast,FromFirst FROM `Reciprocity-Preview` GROUP BY FromID ORDER BY COUNT(*) DESC
+
+
+TO APPLY RECIPROCITY:
+
+** Note 1: Always update subtotals after running
+** Note 2: Remove all .orderConfirmation files since balances may not be accurate
+
+INSERT INTO OrderDetails (OrderNumber, NameID, Reciprocity)
+SELECT Orders.OrderNumber, Recip.NeededForID, 1 AS Reciprocity
+FROM `Reciprocity-Preview` AS Recip
+INNER JOIN Orders ON Orders.NameID=Recip.FromID
+WHERE Orders.Year=YEAR(CURDATE())
+
+
+TO UNDO RECIPROCITY:  ** Note: Always update subtotals after!
+
+DELETE OrderDetails
+FROM OrderDetails
+INNER JOIN Orders ON Orders.OrderNumber=OrderDetails.OrderNumber
+WHERE ((Orders.Year=YEAR(CURDATE())) AND (OrderDetails.Reciprocity=1))
+
+
+TO UPDATE SUBTOTALS:  ** Note: Does not increase the added donation for credit card orders!
+                      ** Note: If prices have changed, need to update Prices table first!!
+
+UPDATE Orders
+INNER JOIN _CostCalculator AS cc ON Orders.OrderNumber=cc.OrderNumber
+SET Subtotal=cc.NewTotal, Orders.LastUpdated=null
+WHERE ((cc.NewTotal<>cc.OldTotal) AND (Orders.Year=YEAR(CURDATE())))
+
+
+TO GET RECIPROCITY SUMMARY REPORT:
+
+http://shalachmanot.org/admin.php?id=user@domain.com&action=export&view=Reciprocity-ReviewSummary
+
+
+CARD NAMES QUERY:
+
+SELECT p2.LastName AS ForLast, p2.FirstNames AS ForFirst, CONCAT(p2.FirstNames," ",p2.LastName,IF(p2.AndFamily," and Family","")) AS ForName,
+p1.LastName AS FromLast, p1.FirstNames AS FromFirst,
+CONCAT(IF((Orders.CustomName IS NOT NULL) AND (LENGTH(Orders.CustomName) > 0),Orders.CustomName,CONCAT(p1.FirstNames," ",p1.LastName,IF(p1.AndFamily," and Family",""))),IF((((Orders.AllMembers=1) AND (p2.Status="Member")) OR ((Orders.AllAssociates=1) AND (p2.Status="Associate")) OR ((Orders.AllStaff=1) AND (p2.Staff=1)))," *","")) AS FromName,
+IF((((Orders.AllMembers=1) AND (p2.Status="Member")) OR ((Orders.AllAssociates=1) AND (p2.Status="Associate")) OR ((Orders.AllStaff=1) AND (p2.Staff=1))),1,0) AS Benefactor,
+p2.Delivery, p2.Mapsco
+FROM (People AS p1, People AS p2)
+JOIN Orders ON Orders.NameID=p1.NameID
+LEFT JOIN OrderDetails ON ((Orders.OrderNumber=OrderDetails.OrderNumber) AND (OrderDetails.NameID=p2.NameID))
+WHERE (Orders.Year=YEAR(CURDATE())) AND ((OrderDetails.NameID IS NOT NULL) OR ((Orders.AllMembers=1) AND (p2.Status="Member")) OR ((Orders.AllAssociates=1) AND (p2.Status="Associate")) OR ((Orders.AllStaff=1) AND (p2.Staff=1)))
+ORDER BY p2.Delivery, p2.DeliveryRoute, p2.Mapsco, p2.LastName, p2.FirstNames, p1.LastName, p1.FirstNames
+
+** Note: The card names query & summary are already setup as views. To dump the card name data to CSV, use the following:
+         http://shalachmanot.org/admin.php?id=user@domain.com&action=export&view=CardNameSummary
+
+
+CARD NAMES WITH SEPARATE LIST OF BENEFACTORS (WITHOUT MAPSCO):
+
+SELECT p2.LastName AS ForLast, p2.FirstNames AS ForFirst, CONCAT(p2.FirstNames," ",p2.LastName,IF(p2.AndFamily," and Family","")) AS ForName,
+p1.LastName AS FromLast, p1.FirstNames AS FromFirst,
+CONCAT(IF((Orders.CustomName IS NOT NULL) AND (LENGTH(Orders.CustomName) > 0),Orders.CustomName,CONCAT(p1.FirstNames," ",p1.LastName,IF(p1.AndFamily," and Family","")))) AS FromName,
+IF((((Orders.AllMembers=1) AND (p2.Status="Member")) OR ((Orders.AllAssociates=1) AND (p2.Status="Associate")) OR ((Orders.AllStaff=1) AND (p2.Staff=1))),1,0) AS Benefactor,
+p2.Delivery
+FROM (People AS p1, People AS p2)
+JOIN Orders ON Orders.NameID=p1.NameID
+LEFT JOIN OrderDetails ON ((Orders.OrderNumber=OrderDetails.OrderNumber) AND (OrderDetails.NameID=p2.NameID))
+WHERE (Orders.Year=YEAR(CURDATE())) AND ((OrderDetails.NameID IS NOT NULL) OR ((Orders.AllMembers=1) AND (p2.Status="Member")) OR ((Orders.AllAssociates=1) AND (p2.Status="Associate")) OR ((Orders.AllStaff=1) AND (p2.Staff=1)))
+ORDER BY p2.Delivery, p2.DeliveryRoute, p2.LastName, p2.FirstNames, p1.LastName, p1.FirstNames
+
+** If necessary, remove ^M chars using Emacs
+
+
+EMAILS TO SEND:
+
+SELECT DISTINCT People.NameID,People.FirstNames,People.LastName,People.Email
+FROM People JOIN OrderDetails ON People.NameID=OrderDetails.NameID
+JOIN Orders AS o1 ON (o1.OrderNumber=OrderDetails.OrderNumber AND o1.Year=2015)
+JOIN People AS po ON o1.NameID=po.NameID
+LEFT JOIN Orders AS o2 ON (o2.NameID=OrderDetails.NameID AND o2.Year=2015)
+LEFT JOIN EmailSent ON (EmailSent.NameID=OrderDetails.NameID AND EmailSent.Year=2015)
+WHERE EmailSent.NameID IS NULL AND o2.OrderNumber IS NULL AND (People.Status<>'Non-Member'OR People.Staff=1) AND People.Email IS NOT NULL AND People.Email<>'' AND (po.Status<>'Non-Member' OR People.Staff=1)
+
+
+UPDATE EMAILS:
+
+UPDATE People JOIN Emails ON People.NameID=Emails.NameID SET People.Email=Emails.Email
+WHERE (People.Email IS NULL OR People.Email='') AND Emails.Email IS NOT NULL AND Emails.Email<>''
+
+
+VALUE OF EMAILS SENT:
+
+SELECT SUM(Orders.Subtotal) FROM EmailSent JOIN People ON People.NameID=EmailSent.NameID LEFT JOIN OrdersFromLastYear ON EmailSent.NameID=OrdersFromLastYear.NameID LEFT JOIN OrdersFromTwoYearsAgo ON EmailSent.NameID=OrdersFromTwoYearsAgo.NameID JOIN Orders ON (EmailSent.NameID=Orders.NameID AND Orders.Year=2018) WHERE OrdersFromLastYear.NameID IS NULL AND OrdersFromTwoYearsAgo.NameID IS NULL
+
+SELECT People.FirstNames,People.LastName,Orders.Subtotal FROM EmailSent JOIN People ON People.NameID=EmailSent.NameID LEFT JOIN OrdersFromLastYear ON EmailSent.NameID=OrdersFromLastYear.NameID LEFT JOIN OrdersFromTwoYearsAgo ON EmailSent.NameID=OrdersFromTwoYearsAgo.NameID JOIN Orders ON (EmailSent.NameID=Orders.NameID AND Orders.Year=2018) WHERE OrdersFromLastYear.NameID IS NULL AND OrdersFromTwoYearsAgo.NameID IS NULL ORDER BY People.LastName, People.FirstNames
+
+SELECT COUNT(`Reciprocity-Preview`.NeededForID) FROM EmailSent JOIN `Reciprocity-Preview` ON EmailSent.NameID=`Reciprocity-Preview`.FromID LEFT JOIN OrdersFromLastYear ON EmailSent.NameID=OrdersFromLastYear.NameID LEFT JOIN OrdersFromTwoYearsAgo ON EmailSent.NameID=OrdersFromTwoYearsAgo.NameID JOIN Orders ON (EmailSent.NameID=Orders.NameID AND Orders.Year=2018) WHERE OrdersFromLastYear.NameID IS NULL AND OrdersFromTwoYearsAgo.NameID IS NULL
+
+
+POTENTIAL INVITEES:
+
+SELECT DISTINCT People.* FROM People JOIN Orders ON People.NameID=Orders.NameID WHERE Orders.Year<YEAR(CURDATE()) AND People.Invited=0 AND People.Status="Non-Member" AND People.Staff=0
+
+SELECT DISTINCT Orders.Year,People.* FROM People JOIN Orders ON People.NameID=Orders.NameID WHERE Orders.Year<YEAR(CURDATE()) AND People.Invited=0 AND People.Status="Non-Member" AND People.Staff=0 ORDER BY People.LastName
+
+
+INVITEES WITH EMAIL ADDRESSES:
+
+SELECT LastName, FirstNames, Email, Email2 FROM People WHERE Status LIKE 'Non-Member' AND Invited = 1 AND Email IS NOT NULL AND Email <> '' ORDER BY LastName,FirstNames
+
+
+ADD NAMEIDs TO IMPORTED ROUTES (deliveries table):
+
+UPDATE deliveries d JOIN People p ON d.Last=p.LastName AND d.First=p.FirstNames
+SET d.NameID=p.NameID WHERE d.NameID IS NULL OR d.NameID=0
+
+** Check to see that all names were matched (no NameID=0)
+
+
+CHECK THAT ALL DELIVERIES HAVE DELIVERY=1
+
+SELECT d.* FROM deliveries d, People p WHERE d.NameID=p.NameID AND p.Delivery=0
+
+** Set Delivery=1 for these:
+
+UPDATE People p JOIN deliveries d ON d.NameID=p.NameID
+SET p.Delivery=1 WHERE p.Delivery=0
+
+
+CHECK THAT ALL DELIVERIES ARE ON THE DELIVERY LIST
+
+SELECT DISTINCT p.* FROM People p JOIN _DeliveryData dd ON p.NameID=dd.NameID
+LEFT JOIN deliveries d ON p.NameID=d.NameID
+WHERE p.Delivery=1 AND d.NameID IS NULL AND p.DeliveryRoute<>"AT"
+
+** Set Delivery=0 for these
+
+
+ADD ROUTES TO PEOPLE TABLE (AND CLEAR OLD ROUTES)
+
+UPDATE People p LEFT JOIN deliveries d ON d.NameID=p.NameID
+SET p.DeliveryRoute=d.Route
+WHERE (p.DeliveryRoute<>d.Route OR d.Route IS NULL AND p.DeliveryRoute<>"" OR d.Route IS NOT NULL AND p.DeliveryRoute="") AND p.DeliveryRoute<>"AT"
+
+
+FIND OUT WHO PLACED AN ORDER THIS YEAR BUT NEVER BEFORE (since we went online):
+
+SELECT People.LastName, People.FirstNames, People.Email FROM People JOIN Orders o1 ON People.NameID=o1.NameID JOIN Orders o2 ON People.NameID=o2.NameID WHERE o1.Year=YEAR(CURDATE()) AND People.Status<>"Non-Member" GROUP BY People.NameID HAVING COUNT(o2.OrderNumber)=1 ORDER BY People.LastName, People.FirstNames
+
+
+FIND OUT WHICH MEMBERS RECEIVED BASKETS FROM BENEFACTORS ONLY:
+
+SELECT People.LastName, People.FirstNames, People.Email, People.Email2, People.PhoneNumber FROM People LEFT JOIN OrderDetails od ON People.NameID=od.NameID LEFT JOIN Orders o1 ON o1.OrderNumber=od.OrderNumber AND o1.Year=YEAR(CURDATE()) LEFT JOIN Orders o2 ON o2.OrderNumber=od.OrderNumber AND o2.Year<>YEAR(CURDATE()) WHERE People.Status="Member" GROUP BY People.NameID HAVING COUNT(o1.OrderNumber)=0 ORDER BY 1,2
+
+
+SET ALL NON-MEMBER LOCAL DELIVERIES TO BE DELIVERED RATHER THAN SHIPPED:
+
+SELECT DISTINCT p.NameID, p.LastName, p.FirstNames, p.StreetAddress, p.City, p.Delivery
+FROM People p JOIN OrderDetails od ON p.NameID=od.NameID JOIN Orders o ON o.OrderNumber=od.OrderNumber
+WHERE p.Status="Non-Member" AND o.Year=YEAR(CURDATE()) AND p.Delivery=0 AND p.DeliveryRoute<>"AT"
+AND p.State="TX" AND p.City IN ("Dallas","Plano","Addison","Richardson","Carrollton","Frisco","McKinney","Allen","The Colony") ORDER BY p.City, p.ZipCode, p.LastName, p.FirstNames
+
+UPDATE People AS p JOIN OrderDetails od ON p.NameID=od.NameID JOIN Orders o ON o.OrderNumber=od.OrderNumber
+SET p.Delivery=1
+WHERE p.Status="Non-Member" AND o.Year=YEAR(CURDATE()) AND p.Delivery=0 AND p.DeliveryRoute<>"AT"
+AND p.State="TX" AND p.City IN ("Dallas","Plano","Addison","Richardson","Carrollton","Frisco","McKinney","Allen","The Colony")
+
+
+SET ALL COLLEGE LOCAL DELIVERIES:
+
+SELECT p.NameID, p.LastName, p.FirstNames, p.StreetAddress, p.City, p.Delivery
+FROM People p
+WHERE p.Status="College" AND p.Delivery=0 AND p.DeliveryRoute<>"AT"
+AND p.State="TX" AND p.City IN ("Dallas","Plano","Addison","Richardson","Carrollton","Frisco","McKinney","Allen","The Colony") ORDER BY p.City, p.ZipCode, p.LastName, p.FirstNames
+
+UPDATE People SET Delivery=1
+WHERE Status="College" AND Delivery=0 AND DeliveryRoute<>"AT"
+AND State="TX" AND City IN ("Dallas","Plano","Addison","Richardson","Carrollton","Frisco","McKinney","Allen","The Colony")

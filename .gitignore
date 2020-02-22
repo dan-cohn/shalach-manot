@@ -1,0 +1,9 @@
+*~
+.*~
+Thumbs.db
+
+/credentials-*.php
+/mail
+/unused_confirmation_mails
+/cat_sm_*.txt
+/settings-*.php

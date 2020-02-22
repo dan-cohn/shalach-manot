@@ -1,0 +1,113 @@
+body
+{
+	margin: 0;
+	font-family: arial, verdana;
+	min-width: 620px;
+	width: expression(document.documentElement.clientWidth < 621 ? '620px' : '100%');
+}
+
+#head
+{
+	background: url(../images/logo.gif) no-repeat center;
+	background-color: #ABF;
+	height: 85px;
+}
+
+#head h1
+{
+	display: none;
+}
+
+#nav
+{
+	top: 85px;
+	height: 25px;
+	background-color: #67b;
+}
+
+#nav ul
+{
+	width: 620px;
+	margin: auto;
+	padding: 0;
+	height: 25px;
+}
+
+#nav li
+{
+	list-style: none;
+	float: left;
+}
+
+#nav a
+{
+	text-decoration: none;
+	line-height: 25px;
+	float: left;
+	font-weight: 700;
+	color: white;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+#nav a:hover
+{
+	background-color : #eef;
+	color : #2F4F4F;
+}
+
+#nav .current
+{
+	background-color: #bcf;	
+	color : #2F4F4F;
+}
+
+#contents
+{
+	padding: 10px;
+	margin: auto;
+	width: 600px;
+}
+
+#contents h2
+{
+	background-color: #ABF;
+	padding-left: 5px;
+	font-size: 1.1em;
+	margin: 0px;
+	font-weight: 700;
+	border-top: 1px solid #67b;
+	border-bottom: 1px solid #67b;
+	margin-bottom: -5px;
+}
+
+#foot
+{
+	height: 20px;
+	background-color: #67b;
+	text-align: center;
+	color: white;
+	font-size: 0.9em;
+	line-height: 20px;
+}
+
+form
+{
+	text-align: center;
+}
+
+.finePrint
+{
+	font-size: 0.7em;
+	text-align: center;
+}
+
+.code
+{
+	border: 1px solid #67b;
+	font-size: 0.8em;
+	padding: 5px;
+	margin: 15px;
+	background-color: #EEF;
+	white-space: pre;
+}
