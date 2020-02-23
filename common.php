@@ -1,23 +1,9 @@
 <?php
 // --------------------------------------
-// Common PHP constants & functions
+// Common PHP functions
 // --------------------------------------
 //
 // Copyright (c) 2009-2020 Daniel M. Cohn
-
-// price globals
-//
-// important: if these change, it's also necessary to change the Prices table in the DB
-//            before running reciprocity
-$price_basket     =   7.50;
-$price_extra      =  12.50;
-$price_nm_local   =  12.50;  // not used right now
-$price_nm_ship    =  25.00;
-$price_benefactor = 500.00;
-
-// other globals
-$alert_prefix = "ATSM ";  // override in other pages if necessary
-$db_connect_err = "Unable to connect to database. If this problem persists, please contact Dan Cohn at 214-405-3044.";
 
 // connectDB: connect to the SM database
 function connectDB() {

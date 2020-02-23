@@ -18,12 +18,30 @@ $web_addr         = "http://localhost:8080/shalachmanot";
 $cc_checkout      = "";
 $cc_account       = "";
 
+// prices
+//
+// important: if these change, it's also necessary to change the Prices table in the DB
+//            before running reciprocity
+$price_basket     =   7.50;
+$price_extra      =  12.50;
+$price_nm_local   =  12.50;  // not used right now
+$price_nm_ship    =  25.00;
+$price_benefactor = 500.00;
+
 // MySQL globals
 $db_server   = "localhost";
 $db_database = "catsm";
+
+// DB credentials; contains the following:
+// $db_user = ""
+// $db_pwd  = ""
 include("credentials-local.php");
 
-// fake mail function - write to files
+// other globals
+$alert_prefix = "SM ";
+$db_connect_err = "Unable to connect to database. If this problem persists, please contact a synagogue representative.";
+
+// fake mail function - write to files for local testing
 function send_email($to, $subject, $body, $headers) {
   $prefix = "mail/".date("Y-m-d.His").".".hash("crc32",$body,false);
   $suffix = ".txt";
@@ -37,5 +55,10 @@ function send_email($to, $subject, $body, $headers) {
   return true;
 }
 
+// real mail function
+//
+// function send_email($to, $subject, $body, $headers) {
+//   return mail($to, $subject, $body, $headers);
+// }
 
 ?>
