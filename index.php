@@ -670,7 +670,7 @@ function action_pin() {
   
   if (!connectDB()) {
     echo $db_connect_err;
-    return;
+    return false;
   }
   
   $nameid = $_REQUEST["id"];
@@ -800,7 +800,7 @@ function action_remind() {
 
   if (!connectDB()) {
     echo $db_connect_err;
-    return;
+    return false;
   }
   
   $result = mysqli_query($db_link,"SELECT LastName,FirstNames,Email,o.OrderNumber AS Num,o.PIN AS Pin"
@@ -851,13 +851,13 @@ function action_remind() {
   return false;
 }
 
-// action_remind: handle AJAX request to e-mail link to preload prior year's order (going 1 or 2 years back)
+// action_sendlink: handle AJAX request to e-mail link to preload prior year's order (going 1 or 2 years back)
 function action_sendlink() {
   global $mail_from, $mail_help, $web_addr, $db_connect_err, $db_link;
 
   if (!connectDB()) {
     echo $db_connect_err;
-    return;
+    return false;
   }
 
   $result = mysqli_query($db_link,"SELECT LastName,FirstNames,Email,Email2,o.PIN AS Pin"

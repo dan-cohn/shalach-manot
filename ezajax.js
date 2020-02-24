@@ -39,7 +39,7 @@ function EzAjaxObject(baseUrl, initialTimeLimit, maxRetries) {
       url+="&sid="+sid;
       return url;
     }
-    
+
     this.reply = function(response) {
       if (cb) cb(response);
     }
@@ -60,8 +60,8 @@ function EzAjaxObject(baseUrl, initialTimeLimit, maxRetries) {
   function stateChange() {
     var result, resultText;
 
-	if (!xmlhttp) return;  // this can happen; perhaps because request already timed out
-	
+    if (!xmlhttp || !reqTimer) return;  // request timed out before receiving a response
+
     if (xmlhttp.readyState === 4) {  // request completed & response ready
 
       if (reqTimer) {
@@ -106,7 +106,7 @@ function EzAjaxObject(baseUrl, initialTimeLimit, maxRetries) {
   }
 
   function timeoutHandler() {
-    reqTimer = null;    
+    reqTimer = null;
 
     if (xmlhttp) {  // sanity check
       xmlhttp.abort();
@@ -165,11 +165,11 @@ function EzAjaxObject(baseUrl, initialTimeLimit, maxRetries) {
       popRequest();
     }
   }
-  
+
   // API for checking to see if a request is still in progress
   this.isBusy = function() {
     return (currIndex > 0);
   }
 }
 
-var ezAjax = new EzAjaxObject("", 8000, 2);
+var ezAjax = new EzAjaxObject("", 15000, 2);
