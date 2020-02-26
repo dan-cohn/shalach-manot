@@ -1067,7 +1067,7 @@ This will open a new window or tab where you can complete the order form.</p>
                 Additional names to be added when Reciprocity is applied
             </li>
             <li>
-                <input type="button" class="report" value="Reciprocity Review" onclick="exportData('Reciprocity-Review');"/>
+                <input type="button" class="report" value="Reciprocity Review" onclick="exportData('Reciprocity-ReviewSummary');"/>
                 Names added for Reciprocity (only applicable after Reciprocity applied)
             </li>
             <li>

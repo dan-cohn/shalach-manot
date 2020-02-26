@@ -39,7 +39,6 @@ SELECT COUNT(*),FromID,FromLast,FromFirst FROM `Reciprocity-Preview` GROUP BY Fr
 TO APPLY RECIPROCITY:
 
 ** Note 1: Always update subtotals after running
-** Note 2: Remove all .orderConfirmation files since balances may not be accurate
 
 INSERT INTO OrderDetails (OrderNumber, NameID, Reciprocity)
 SELECT Orders.OrderNumber, Recip.NeededForID, 1 AS Reciprocity
@@ -56,18 +55,12 @@ INNER JOIN Orders ON Orders.OrderNumber=OrderDetails.OrderNumber
 WHERE ((Orders.Year=YEAR(CURDATE())) AND (OrderDetails.Reciprocity=1))
 
 
-TO UPDATE SUBTOTALS:  ** Note: Does not increase the added donation for credit card orders!
-                      ** Note: If prices have changed, need to update Prices table first!!
+TO UPDATE SUBTOTALS:  ** Note: If prices have changed, need to update Prices table first!!
 
 UPDATE Orders
 INNER JOIN _CostCalculator AS cc ON Orders.OrderNumber=cc.OrderNumber
 SET Subtotal=cc.NewTotal, Orders.LastUpdated=null
 WHERE ((cc.NewTotal<>cc.OldTotal) AND (Orders.Year=YEAR(CURDATE())))
-
-
-TO GET RECIPROCITY SUMMARY REPORT:
-
-http://shalachmanot.org/admin.php?id=user@domain.com&action=export&view=Reciprocity-ReviewSummary
 
 
 CARD NAMES QUERY:

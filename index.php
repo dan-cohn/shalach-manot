@@ -1074,7 +1074,7 @@ function emailRecips($order_num) {
   $headers.= "Content-type: text/html;charset=iso-8859-1\r\n";
   $headers.= "From: ".$mail_from."\r\n";
   $headers.= "Reply-To: ".$mail_help."\r\n";
-  $headers.= "Bcc: ".$mail_bcc_list."\r\n";  // TODO - remove this once confident it's working correctly
+  $headers.= "Bcc: ".$mail_bcc_list."\r\n";
   $body1   = "<html><head><title>Anshai Torah Shalach Manot</title></head>\r\n";
   $body1  .= "<body style='font-family:Georgia,Times,serif;font-size:11pt;color:black;'>\r\n";
   $body3   = "<p><i>Someone at Congregation Anshai Torah has sponsored a Purim basket for you!</i></p>\r\n";
@@ -1155,7 +1155,7 @@ function form_submit() {
   $cnf.="<body style='font-family:Georgia,Times,serif;font-size:11pt;color:black;background-color:#f0f0a0'>";
   $cnf.="<p style='font-weight:bold;font-size:15pt;margin:.75em 0;color:black;background-color:#8080c0;padding:4px'>Congregation Anshai Torah<br/>Shalach Manot Order Confirmation</p>\r\n";
   if ($order_data) {
-    $cnf.="<p><i><b>Note:</b> This replaces your previous order(s) for this year.</i></p>";
+    $cnf.="<p><i><b>Note:</b> This supercedes your previous order(s) for this year.</i></p>";
   }
   $cnf.="<p>Here are the details of your order. Use <a href='".$web_addr."?open=".$_REQUEST["member"].".".$pin."'>this link</a> to view or modify your order. ";
   $cnf.="If you have any questions or concerns, please e-mail Dan Cohn at ";
@@ -2649,9 +2649,9 @@ function pin_callback(result) {
       gebi("extra_count").value=result['ExtraBaskets'];
     }
     gebi("wrong").style.display="none";
-    gebi("reorder_note").innerHTML="Note: If you make changes and submit, it will replace "+((admin_user)?"the":"your")+" previous order (#"+result['OrderNumber']+").";
+    gebi("reorder_note").innerHTML="Note: If you make changes and submit, it will modify "+((admin_user)?"the":"your")+" previous order (#"+result['OrderNumber']+").";
     gebi("reorder_note").style.display="inline";
-    gebi("submit_help").innerHTML="&lt;&lt; Press here when ready. This will replace "+((admin_user)?"the":"your")+" previous order.</b>";
+    gebi("submit_help").innerHTML="&lt;&lt; Press here when ready. This will modify "+((admin_user)?"the":"your")+" previous order.</b>";
     gebi("enterpin").style.display="none";
     gebi("top").style.cursor="auto";
     activateForm();
