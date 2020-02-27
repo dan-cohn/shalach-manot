@@ -856,7 +856,7 @@ CREATE VIEW LargeNonBenefactorOrdersFromLastYear  AS  select p.FirstNames AS Fir
 --
 DROP TABLE IF EXISTS `LocalShipments`;
 
-CREATE VIEW LocalShipments  AS  select p.NameID AS NameID,p.FirstNames AS FirstNames,p.LastName AS LastName,p.StreetAddress AS StreetAddress,p.City AS City,p.`Status` AS `Status` from ((People p left join OrderDetails on(p.NameID = OrderDetails.NameID)) left join Orders on(Orders.OrderNumber = OrderDetails.OrderNumber)) where (OrderDetails.NameID is not null or p.`Status` <> 'Non-Member') and p.Delivery = 0 and Orders.`Year` = year(curdate()) and p.State = 'TX' and p.City in ('Dallas','Plano','Addison','Richardson','Carrollton','Frisco','McKinney','Allen','The Colony') order by p.City,p.LastName,p.FirstNames ;
+CREATE VIEW LocalShipments  AS  select p.NameID AS NameID,p.FirstNames AS `First`,p.LastName AS `Last`,p.StreetAddress AS `Street Address`,p.City AS City,p.State AS State,p.ZipCode AS ZipCode,p.`Status` AS `Status` from ((People p left join OrderDetails on(p.NameID = OrderDetails.NameID)) left join Orders on(Orders.OrderNumber = OrderDetails.OrderNumber)) where (OrderDetails.NameID is not null or p.`Status` <> 'Non-Member') and p.Delivery = 0 and Orders.`Year` = year(curdate()) and p.State = 'TX' and p.City in ('Dallas','Plano','Addison','Richardson','Carrollton','Frisco','McKinney','Allen','The Colony') order by p.ZipCode,p.LastName,p.FirstNames ;
 
 -- --------------------------------------------------------
 
