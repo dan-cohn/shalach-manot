@@ -93,7 +93,7 @@ LEFT JOIN OrderDetails ON ((Orders.OrderNumber=OrderDetails.OrderNumber) AND (Or
 WHERE (Orders.Year=YEAR(CURDATE())) AND ((OrderDetails.NameID IS NOT NULL) OR ((Orders.AllMembers=1) AND (p2.Status="Member")) OR ((Orders.AllAssociates=1) AND (p2.Status="Associate")) OR ((Orders.AllStaff=1) AND (p2.Staff=1)))
 ORDER BY p2.Delivery, p2.DeliveryRoute, p2.LastName, p2.FirstNames, p1.LastName, p1.FirstNames
 
-** If necessary, remove ^M chars using Emacs
+Link: http://shalachmanot.org/admin.php?id=user@domain.com&action=export&view=CardNameSummary2
 
 
 EMAILS TO SEND:
@@ -135,6 +135,7 @@ SELECT LastName, FirstNames, Email, Email2 FROM People WHERE Status LIKE 'Non-Me
 
 
 ADD NAMEIDs TO IMPORTED ROUTES (deliveries table):
+(only required if NameIDs were missing)
 
 UPDATE deliveries d JOIN People p ON d.Last=p.LastName AND d.First=p.FirstNames
 SET d.NameID=p.NameID WHERE d.NameID IS NULL OR d.NameID=0

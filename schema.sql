@@ -320,6 +320,25 @@ CREATE TABLE `CardNameSummary` (
 -- --------------------------------------------------------
 
 --
+-- Stand-in structure for view _CardNameSummary2
+-- (See below for the actual view)
+--
+CREATE TABLE `_CardNameSummary2` (
+`sort1` tinyint(1)
+,`sort2` varchar(40)
+,`sort3` varchar(25)
+,`sort4` varchar(60)
+,`ForName` varchar(97)
+,`NameList` longtext
+,`BeneList` longtext
+,`NameCount` bigint(21)
+,`BeneCount` bigint(21)
+,`Route` varchar(40)
+);
+
+-- --------------------------------------------------------
+
+--
 -- Stand-in structure for view CardNameSummary2
 -- (See below for the actual view)
 --
@@ -793,7 +812,7 @@ CREATE VIEW CardNames  AS  select p2.LastName AS ForLast,p2.FirstNames AS ForFir
 --
 DROP TABLE IF EXISTS `CardNames2`;
 
-CREATE VIEW CardNames2  AS  select p2.LastName AS ForLast,p2.FirstNames AS ForFirst,concat(p2.FirstNames,' ',p2.LastName,if(p2.AndFamily,' and Family','')) AS ForName,p1.LastName AS FromLast,p1.FirstNames AS FromFirst,concat(if(Orders.CustomName is not null and length(Orders.CustomName) > 0,Orders.CustomName,concat(p1.FirstNames,' ',p1.LastName,if(p1.AndFamily,' and Family','')))) AS FromName,if(Orders.AllMembers = 1 and (p2.`Status` = 'Member' or p2.`Status` = 'College') or Orders.AllAssociates = 1 and p2.`Status` = 'Associate' or Orders.AllStaff = 1 and p2.Staff = 1,1,0) AS Benefactor,p2.Delivery AS Delivery,p2.DeliveryRoute AS Route from (((People p1 join People p2) join Orders on(Orders.NameID = p1.NameID)) left join OrderDetails on(Orders.OrderNumber = OrderDetails.OrderNumber and OrderDetails.NameID = p2.NameID)) where Orders.`Year` = year(curdate()) and (OrderDetails.NameID is not null or Orders.AllMembers = 1 and (p2.`Status` = 'Member' or p2.`Status` = 'College') or Orders.AllAssociates = 1 and p2.`Status` = 'Associate' or Orders.AllStaff = 1 and p2.Staff = 1) order by p2.Delivery,p2.DeliveryRoute,p2.LastName,p2.FirstNames,p1.LastName,p1.FirstNames ;
+CREATE VIEW CardNames2  AS  select p2.LastName AS ForLast,p2.FirstNames AS ForFirst,concat(p2.FirstNames,' ',p2.LastName,if(p2.AndFamily,' and Family','')) AS ForName,p1.LastName AS FromLast,p1.FirstNames AS FromFirst,concat(if(Orders.CustomName is not null and length(Orders.CustomName) > 0,Orders.CustomName,concat(p1.FirstNames,' ',p1.LastName,if(p1.AndFamily,' and Family','')))) AS FromName,if(Orders.AllMembers = 1 and (p2.`Status` = 'Member' or p2.`Status` = 'College') or Orders.AllAssociates = 1 and p2.`Status` = 'Associate' or Orders.AllStaff = 1 and p2.Staff = 1,1,0) AS Benefactor,p2.Delivery AS Delivery,p2.DeliveryRoute AS Route from (((People p1 join People p2) join Orders on(Orders.NameID = p1.NameID)) left join OrderDetails on(Orders.OrderNumber = OrderDetails.OrderNumber and OrderDetails.NameID = p2.NameID)) where Orders.`Year` = year(curdate()) and (OrderDetails.NameID is not null or Orders.AllMembers = 1 and (p2.`Status` = 'Member' or p2.`Status` = 'College') or Orders.AllAssociates = 1 and p2.`Status` = 'Associate' or Orders.AllStaff = 1 and p2.Staff = 1) ;
 
 -- --------------------------------------------------------
 
@@ -807,11 +826,28 @@ CREATE VIEW CardNameSummary  AS  select CardNames.ForName AS ForName,group_conca
 -- --------------------------------------------------------
 
 --
+-- Structure for view _CardNameSummary2
+--
+DROP TABLE IF EXISTS `_CardNameSummary2`;
+
+-- Note from Dan:
+--
+-- I had to create this intermediate view because of a strange behavior I
+-- observed in the current version of MySQL/MariaDB. It would not sort this view
+-- correctly with an ORDER BY clause. The results were a mess. I'm not sure if
+-- it's a bug or I was missing something. In any case, creating another view
+-- (CardNameSummary2) on top of this one allows me to sort the result set.
+
+CREATE VIEW _CardNameSummary2  AS  select distinct c1.Delivery AS sort1,c1.Route AS sort2,c1.Last AS sort3,c1.First AS sort4,c1.ForName AS ForName,ifnull(c2.FromNames,'') AS NameList,ifnull(c3.FromNames,'') AS BeneList,ifnull(c2.NameCount,0) AS NameCount,ifnull(c3.NameCount,0) AS BeneCount,c1.Route AS Route from ((_CardNames2Rollup c1 left join _CardNames2Rollup c2 on(c1.ForName = c2.ForName and c2.Benefactor = 0)) left join _CardNames2Rollup c3 on(c1.ForName = c3.ForName and c3.Benefactor = 1));
+
+-- --------------------------------------------------------
+
+--
 -- Structure for view CardNameSummary2
 --
 DROP TABLE IF EXISTS `CardNameSummary2`;
 
-CREATE VIEW CardNameSummary2  AS  select distinct c1.ForName AS ForName,ifnull(c2.FromNames,'') AS NameList,ifnull(c3.FromNames,'') AS BeneList,ifnull(c2.NameCount,0) AS NameCount,ifnull(c3.NameCount,0) AS BeneCount,c1.Route AS Route from ((_CardNames2Rollup c1 left join _CardNames2Rollup c2 on(c1.ForName = c2.ForName and c2.Benefactor = 0)) left join _CardNames2Rollup c3 on(c1.ForName = c3.ForName and c3.Benefactor = 1)) ;
+CREATE VIEW CardNameSummary2  AS  select ForName,NameList,BeneList,NameCount,BeneCount,Route FROM _CardNameSummary2 ORDER BY sort1,sort2,sort3,sort4;
 
 -- --------------------------------------------------------
 
@@ -856,7 +892,7 @@ CREATE VIEW LargeNonBenefactorOrdersFromLastYear  AS  select p.FirstNames AS Fir
 --
 DROP TABLE IF EXISTS `LocalShipments`;
 
-CREATE VIEW LocalShipments  AS  select p.NameID AS NameID,p.FirstNames AS `First`,p.LastName AS `Last`,p.StreetAddress AS `Street Address`,p.City AS City,p.State AS State,p.ZipCode AS ZipCode,p.`Status` AS `Status` from ((People p left join OrderDetails on(p.NameID = OrderDetails.NameID)) left join Orders on(Orders.OrderNumber = OrderDetails.OrderNumber)) where (OrderDetails.NameID is not null or p.`Status` <> 'Non-Member') and p.Delivery = 0 and Orders.`Year` = year(curdate()) and p.State = 'TX' and p.City in ('Dallas','Plano','Addison','Richardson','Carrollton','Frisco','McKinney','Allen','The Colony') order by p.ZipCode,p.LastName,p.FirstNames ;
+CREATE VIEW LocalShipments  AS  select distinct p.NameID AS NameID,p.FirstNames AS `First`,p.LastName AS `Last`,p.StreetAddress AS `Street Address`,p.City AS City,p.State AS State,p.ZipCode AS ZipCode,p.`Status` AS `Status` from ((People p left join OrderDetails on(p.NameID = OrderDetails.NameID)) left join Orders on(Orders.OrderNumber = OrderDetails.OrderNumber)) where (OrderDetails.NameID is not null or p.`Status` <> 'Non-Member') and p.Delivery = 0 and Orders.`Year` = year(curdate()) and p.State = 'TX' and p.City in ('Dallas','Plano','Addison','Richardson','Carrollton','Frisco','McKinney','Allen','The Colony') order by p.ZipCode,p.LastName,p.FirstNames ;
 
 -- --------------------------------------------------------
 
@@ -1009,7 +1045,7 @@ CREATE VIEW Volunteers  AS  select People.FirstNames AS FirstNames,People.LastNa
 --
 DROP TABLE IF EXISTS `_CardNames2Rollup`;
 
-CREATE VIEW _CardNames2Rollup  AS  select CardNames2.ForName AS ForName,group_concat(CardNames2.FromName order by CardNames2.FromLast ASC,CardNames2.FromFirst ASC separator '\n') AS FromNames,count(CardNames2.FromName) AS NameCount,CardNames2.Benefactor AS Benefactor,CardNames2.Route AS Route from CardNames2 group by CardNames2.ForLast,CardNames2.ForFirst,CardNames2.Benefactor ;
+CREATE VIEW _CardNames2Rollup  AS  select CardNames2.ForLast AS Last, CardNames2.ForFirst AS First,CardNames2.ForName AS ForName,group_concat(CardNames2.FromName order by CardNames2.FromLast ASC,CardNames2.FromFirst ASC separator '\n') AS FromNames,count(CardNames2.FromName) AS NameCount,CardNames2.Benefactor AS Benefactor,CardNames2.Delivery AS Delivery, CardNames2.Route AS Route from CardNames2 group by CardNames2.ForLast,CardNames2.ForFirst,CardNames2.Benefactor ;
 
 -- --------------------------------------------------------
 
