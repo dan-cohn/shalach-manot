@@ -38,7 +38,11 @@ UPDATE People SET People.Status = "Non-Member"
 
 - reformat phone numbers to XXX-XXX-XXXX format  // IF NEEDED
 - search for " and " and replace with " & "
-- check for P.O. Boxes (e.g. Fink) and replace with house address
+- check for P.O. Boxes (e.g. Fink) and replace with house address (from prior year)
+- check for other non-deliverable addresses like this one for Opher Banarie:
+    3948 Legacy, Unit 106-136
+  his basket should be left at the shul, which is close to where he lives
+  just let him know (email or call)
 - be careful of Zip Codes that start with zero (if any)
 - save
 
