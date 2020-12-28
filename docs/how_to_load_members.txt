@@ -39,7 +39,7 @@ UPDATE People SET People.Status = "Non-Member"
 - reformat phone numbers to XXX-XXX-XXXX format  // IF NEEDED
 - search for " and " and replace with " & "
 - check for P.O. Boxes (e.g. Fink) and replace with house address (from prior year)
-- check for other non-deliverable addresses like this one for Opher Banarie:
+- check for other non-deliverable addresses like this one for Opher:
     3948 Legacy, Unit 106-136
   his basket should be left at the shul, which is close to where he lives
   just let him know (email or call)
@@ -300,7 +300,7 @@ WHERE DeliveryRoute="AT" AND Status<>"Non-Member" AND Staff=0
 
 [14] Download the checklist (when ready)
 
-http://anshaitorah.org/shalachmanot/admin.php?action=checklist
+https://shalachmanot.org/admin.php?action=checklist
 
 
 [15] Assign or update "admin" passwords for staff and committee members
