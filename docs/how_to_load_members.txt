@@ -3,18 +3,30 @@
     - Login to ShulCloud as admin
     - Go to Reports
     - Membership Report
+    - Select Account Types:
+      - Member: Associate
+      - Member: Full
+      - Member: Honorary
     - Run the report (takes about a minute)
-    - Filter out the Resigned and any other category that's not a member
-    - Export the report to Excel
-    - Open Excel file along with ETL example (from prior year)
-    - Copy "transform" tab into new spreadsheet
-    - Find/replace to remove filename references
-    - Expand or contract the table as needed
-    - Copy/paste to add rows as needed
-    - Adjust names on Sheet1 as needed so there are no formula errors
-    - Copy/paste member data into Members.xlsx
+    - Export the report to clipboard
+    - Open Excel
+    - Paste data into "Sheet1"
+    - Find row containing "Kufert, Joe Test & Stephanie Test" and delete it
+    - Save new spreadsheet as "Membership data.xlsx"
+    - Open "Membership Report - ETL example.xlsx"
+    - Copy "transform" tab into "Membership data.xlsx" as new sheet at end
+    - Find and replace "[Membership Report - ETL example.xlsx]" with nothing (replace all)
+      - This will correct all the formulas so they take data from the new spreadsheet
+    - Expand or contract the table as needed (on transform tab)
+    - Copy/paste to add rows as needed (or delete extra rows)
+    - Adjust names on Sheet1 as needed so there are no formula errors (may not be necessary)
+    - Open previous version of "Members.xlsx"
+    - Clear all data
+    - Save as 2021 version of "Members.xlsx"
+    - Copy/paste member data (cols A-J) (as values only) from "transform" tab into Members.xlsx
     - Bring in College students from CATS in College
     - Sort by Status
+    - Save
 
 
 [1] Populate official first/last names - SHOULD NOT BE REQUIRED
